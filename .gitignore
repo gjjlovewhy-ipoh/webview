@@ -1,0 +1,82 @@
+# Built artifacts
+*.apk
+*.aar
+*.jar
+*.so
+# Keep shared libraries and local libs
+!app/libs/*.aar
+!app/src/main/jniLibs/**/*.so
+
+# Gradle files
+.gradle/
+build/
+/*/build/
+app/build/
+
+# Local configuration file (sdk path, etc.)
+local.properties
+
+# Log files
+*.log
+
+# Android Studio / IntelliJ IDEA
+.idea/
+*.iml
+.navigation/
+
+# Device/Emulator files
+captures/
+
+# Keystore files
+*.jks
+*.keystore
+
+# External / Decompiled / Scratch files in project root
+/DIYP.apk
+/jadx/
+/jadx.zip
+/jdk.zip
+/jre.zip
+/ku9.zip
+/ku9_unzip/
+/temp_*/
+/scratch/
+/新建文件夹/
+/apk_contents.txt
+/apk_files.txt
+/find_jni.py
+/find_jni2.py
+/get_jadx.py
+/generate_icons.py
+/javap_oninfo.txt
+/hbtv.html
+/test.m3u
+/test2.kt
+/test3.kt
+/test_decrypt.py
+/test_parser.kt
+/webview_jscode(1).js
+
+# Java/Kotlin compiled classes in source folder
+**/IjkListenerHelper*.class
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# ==========================================
+# 🛡️ 核心机密源码隔离区 (防抄袭不上传项目)
+# ==========================================
+# 1. 代理模块 (P2P及Socks5中转核心)
+app/src/main/java/com/iptv/tvplayer/proxy/ForceTVProxy.kt
+app/src/main/java/com/iptv/tvplayer/proxy/ProxyManager.kt
+app/src/main/java/com/iptv/tvplayer/proxy/SocksProxyServer.kt
+
+# 2. 本地代理服务器
+app/src/main/java/com/iptv/tvplayer/server/LocalServer.kt
+
+# 3. 核心流媒体解析与解密引擎
+app/src/main/java/com/iptv/tvplayer/data/PlaylistParser.kt
+
+# 4. EPG 模糊匹配调度算法
+app/src/main/java/com/iptv/tvplayer/data/EpgManager.kt
