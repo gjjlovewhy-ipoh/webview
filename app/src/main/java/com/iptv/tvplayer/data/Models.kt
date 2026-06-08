@@ -2,7 +2,8 @@ package com.iptv.tvplayer.data
 
 data class Channel(
     val name: String,
-    val urls: List<String>
+    val urls: List<String>,
+    val logo: String? = null
 )
 
 data class Playlist(

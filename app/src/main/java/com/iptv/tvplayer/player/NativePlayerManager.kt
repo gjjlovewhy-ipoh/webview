@@ -121,16 +121,19 @@ object NativePlayerManager {
     }
 
     private var mpvInitialized = false
+    private val mpvLock = Any()
     private var pendingMpvUrl: String? = null
 
     fun createMPVPlayer(context: Context, url: String): View {
         if (currentView is SurfaceView) {
             startTimeoutJob()
             onPlayerBuffering?.invoke()
-            if (mpvInitialized) {
-                MPVLib.command(arrayOf("loadfile", url))
-            } else {
-                pendingMpvUrl = url
+            synchronized(mpvLock) {
+                if (mpvInitialized) {
+                    MPVLib.command(arrayOf("loadfile", url))
+                } else {
+                    pendingMpvUrl = url
+                }
             }
             return currentView!!
         }
@@ -142,98 +145,105 @@ object NativePlayerManager {
         )
         surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
             override fun surfaceCreated(holder: SurfaceHolder) {
-                MPVLib.create(context)
-                mpvInitialized = true
-                MPVLib.setOptionString("sub-font-provider", "none")
-                
-                // Enhance IPTV compatibility
-                MPVLib.setOptionString("hwdec", "mediacodec,auto")
-                MPVLib.setOptionString("hwdec-codecs", "all")
-                MPVLib.setOptionString("vo", "gpu")
-                MPVLib.setOptionString("deinterlace", "auto") // Auto deinterlace for 1080i streams
-                MPVLib.setOptionString("framedrop", "vo") // Drop video frames if audio gets out of sync
-                MPVLib.setOptionString("vd-lavc-threads", "4") // Multithreaded software decode fallback
-                
-                if (SettingsManager.aspectRatio == "全屏") {
-                    MPVLib.setOptionString("keepaspect", "no")
-                } else {
-                    MPVLib.setOptionString("keepaspect", "yes")
-                }
-                
-                MPVLib.setOptionString("profile", "fast")
-                MPVLib.setOptionString("tls-verify", "no")
-                MPVLib.setOptionString("cache", "yes")
-                MPVLib.setOptionString("demuxer-max-bytes", "64M")
-                MPVLib.setOptionString("demuxer-max-back-bytes", "32M")
-                MPVLib.setOptionString("demuxer-readahead-secs", "10")
-                MPVLib.setOptionString("network-timeout", SettingsManager.timeoutSeconds.toString())
-                
-                if (SettingsManager.userAgent.isNotBlank()) {
-                    MPVLib.setOptionString("user-agent", SettingsManager.userAgent)
-                }
-                if (SettingsManager.headers.isNotBlank()) {
-                    MPVLib.setOptionString("http-header-fields", SettingsManager.headers.replace(",", "\r\n"))
-                }
-                
-                MPVLib.init()
-                MPVLib.attachSurface(holder.surface)
-                MPVLib.observeProperty("eof-reached", MPVLib.MpvFormat.MPV_FORMAT_FLAG)
-                MPVLib.observeProperty("paused-for-cache", MPVLib.MpvFormat.MPV_FORMAT_FLAG)
-                MPVLib.observeProperty("playback-time", MPVLib.MpvFormat.MPV_FORMAT_DOUBLE)
-                
-                MPVLib.addObserver(object : MPVLib.EventObserver {
-                    override fun eventProperty(property: String) {}
-                    override fun eventProperty(property: String, value: Long) {}
-                    override fun eventProperty(property: String, value: Boolean) {
-                        if (!mpvInitialized) return
-                        if (property == "eof-reached" && value) {
-                            if (SettingsManager.autoReconnect) {
-                                MPVLib.command(arrayOf("loadfile", pendingMpvUrl ?: url))
-                            } else {
-                                onAutoSwitchRequested?.invoke()
+                synchronized(mpvLock) {
+                    if (mpvInitialized) return
+                    MPVLib.create(context)
+                    mpvInitialized = true
+                    MPVLib.setOptionString("sub-font-provider", "none")
+                    
+                    // Enhance IPTV compatibility
+                    MPVLib.setOptionString("hwdec", "mediacodec,auto")
+                    MPVLib.setOptionString("hwdec-codecs", "all")
+                    MPVLib.setOptionString("vo", "gpu")
+                    MPVLib.setOptionString("deinterlace", "auto") // Auto deinterlace for 1080i streams
+                    MPVLib.setOptionString("framedrop", "vo") // Drop video frames if audio gets out of sync
+                    MPVLib.setOptionString("vd-lavc-threads", "4") // Multithreaded software decode fallback
+                    
+                    if (SettingsManager.aspectRatio == "全屏") {
+                        MPVLib.setOptionString("keepaspect", "no")
+                    } else {
+                        MPVLib.setOptionString("keepaspect", "yes")
+                    }
+                    
+                    MPVLib.setOptionString("profile", "fast")
+                    MPVLib.setOptionString("tls-verify", "no")
+                    MPVLib.setOptionString("cache", "yes")
+                    MPVLib.setOptionString("demuxer-max-bytes", "64M")
+                    MPVLib.setOptionString("demuxer-max-back-bytes", "32M")
+                    MPVLib.setOptionString("demuxer-readahead-secs", "10")
+                    MPVLib.setOptionString("network-timeout", SettingsManager.timeoutSeconds.toString())
+                    
+                    if (SettingsManager.userAgent.isNotBlank()) {
+                        MPVLib.setOptionString("user-agent", SettingsManager.userAgent)
+                    }
+                    if (SettingsManager.headers.isNotBlank()) {
+                        MPVLib.setOptionString("http-header-fields", SettingsManager.headers.replace(",", "\r\n"))
+                    }
+                    
+                    MPVLib.init()
+                    MPVLib.attachSurface(holder.surface)
+                    MPVLib.observeProperty("eof-reached", MPVLib.MpvFormat.MPV_FORMAT_FLAG)
+                    MPVLib.observeProperty("paused-for-cache", MPVLib.MpvFormat.MPV_FORMAT_FLAG)
+                    MPVLib.observeProperty("playback-time", MPVLib.MpvFormat.MPV_FORMAT_DOUBLE)
+                    
+                    MPVLib.addObserver(object : MPVLib.EventObserver {
+                        override fun eventProperty(property: String) {}
+                        override fun eventProperty(property: String, value: Long) {}
+                        override fun eventProperty(property: String, value: Boolean) {
+                            if (!mpvInitialized) return
+                            if (property == "eof-reached" && value) {
+                                if (SettingsManager.autoReconnect) {
+                                    MPVLib.command(arrayOf("loadfile", pendingMpvUrl ?: url))
+                                } else {
+                                    onAutoSwitchRequested?.invoke()
+                                }
+                            } else if (property == "paused-for-cache") {
+                                if (value) {
+                                    startTimeoutJob()
+                                    onPlayerBuffering?.invoke()
+                                } else {
+                                    cancelTimeoutJob()
+                                    onPlayerReady?.invoke()
+                                }
                             }
-                        } else if (property == "paused-for-cache") {
-                            if (value) {
-                                startTimeoutJob()
-                                onPlayerBuffering?.invoke()
-                            } else {
+                        }
+                        override fun eventProperty(property: String, value: String) {}
+                        override fun eventProperty(property: String, value: Double) {
+                            if (!mpvInitialized) return
+                            if (property == "playback-time" && value > 0) {
                                 cancelTimeoutJob()
                                 onPlayerReady?.invoke()
                             }
                         }
-                    }
-                    override fun eventProperty(property: String, value: String) {}
-                    override fun eventProperty(property: String, value: Double) {
-                        if (!mpvInitialized) return
-                        if (property == "playback-time" && value > 0) {
-                            cancelTimeoutJob()
-                            onPlayerReady?.invoke()
+                        override fun event(eventId: Int) {
+                            if (!mpvInitialized) return
                         }
-                    }
-                    override fun event(eventId: Int) {
-                        if (!mpvInitialized) return
-                        // eventId 22 is MPV_EVENT_END_FILE
-                        if (eventId == 22) {
-                            // Can also trigger auto switch if it's not a normal EOF
-                        }
-                    }
-                })
-                startTimeoutJob()
-                onPlayerBuffering?.invoke()
-                MPVLib.command(arrayOf("loadfile", pendingMpvUrl ?: url))
-                pendingMpvUrl = null
+                    })
+                    startTimeoutJob()
+                    onPlayerBuffering?.invoke()
+                    MPVLib.command(arrayOf("loadfile", pendingMpvUrl ?: url))
+                    pendingMpvUrl = null
+                }
             }
             override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-                MPVLib.setPropertyString("android-surface-size", "${width}x$height")
+                synchronized(mpvLock) {
+                    if (mpvInitialized) {
+                        try {
+                            MPVLib.setPropertyString("android-surface-size", "${width}x$height")
+                        } catch (e: Exception) {}
+                    }
+                }
             }
             override fun surfaceDestroyed(holder: SurfaceHolder) {
-                if (mpvInitialized) {
-                    try {
-                        MPVLib.setPropertyString("vo", "null")
-                        MPVLib.detachSurface()
-                        MPVLib.destroy()
-                    } catch (e: Exception) {}
-                    mpvInitialized = false
+                synchronized(mpvLock) {
+                    if (mpvInitialized) {
+                        try {
+                            MPVLib.setPropertyString("vo", "null")
+                            MPVLib.detachSurface()
+                            MPVLib.destroy()
+                        } catch (e: Exception) {}
+                        mpvInitialized = false
+                    }
                 }
             }
         })
@@ -245,14 +255,15 @@ object NativePlayerManager {
         cancelTimeoutJob()
         exoPlayer?.release()
         exoPlayer = null
-        if (currentView is SurfaceView && mpvInitialized) {
-            // Usually destroyed in surfaceDestroyed, but if abandoned explicitly
-            try {
-                MPVLib.setPropertyString("vo", "null")
-                MPVLib.detachSurface()
-                MPVLib.destroy()
-            } catch (e: Exception) {}
-            mpvInitialized = false
+        synchronized(mpvLock) {
+            if (mpvInitialized) {
+                try {
+                    MPVLib.setPropertyString("vo", "null")
+                    MPVLib.detachSurface()
+                    MPVLib.destroy()
+                } catch (e: Exception) {}
+                mpvInitialized = false
+            }
         }
         currentView = null
     }

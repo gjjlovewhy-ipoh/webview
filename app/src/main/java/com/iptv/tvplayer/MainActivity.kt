@@ -32,6 +32,7 @@ class MainActivity : ComponentActivity() {
     
     private var localServer: LocalServer? = null
     private var currentUrl = ""
+    private var playJob: kotlinx.coroutines.Job? = null
     private lateinit var gestureDetector: GestureDetector
 
     private val localFilePickerLauncher = registerForActivityResult(
@@ -428,17 +429,30 @@ class MainActivity : ComponentActivity() {
         com.iptv.tvplayer.data.SettingsManager.lastCategoryName = cat
         com.iptv.tvplayer.data.SettingsManager.lastChannelName = channel.name
         com.iptv.tvplayer.data.SettingsManager.lastUrlIndex = urlIndex
-        kotlinx.coroutines.MainScope().launch {
+
+        playJob?.cancel()
+        playJob = kotlinx.coroutines.MainScope().launch {
             val resolvedUrl = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 ProxyManager.resolveUrl(url)
             }
+            
+            if (!kotlinx.coroutines.isActive) return@launch
             
             val lowerUrl = resolvedUrl.lowercase()
             val isWebView = lowerUrl.startsWith("webview://") || lowerUrl.startsWith("wb://") || lowerUrl.startsWith("mb://")
             
             if (isWebView) {
                 com.iptv.tvplayer.player.NativePlayerManager.release()
-                playerContainer.removeAllViews()
+                
+                for (i in playerContainer.childCount - 1 downTo 0) {
+                    val child = playerContainer.getChildAt(i)
+                    if (child is android.webkit.WebView) {
+                        playerContainer.removeView(child)
+                        child.destroy()
+                    } else {
+                        playerContainer.removeView(child)
+                    }
+                }
                 
                 val actualUrl = resolvedUrl.substringAfter("://")
                 val isMobile = lowerUrl.startsWith("mb://")
@@ -521,7 +535,7 @@ class MainActivity : ComponentActivity() {
                     webChromeClient = object : android.webkit.WebChromeClient() {
                         private var customView: View? = null
                         private var customViewCallback: CustomViewCallback? = null
-
+ 
                         override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
                             if (customView != null) {
                                 callback?.onCustomViewHidden()
@@ -532,7 +546,7 @@ class MainActivity : ComponentActivity() {
                             playerContainer.addView(view, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
                             this@apply.visibility = View.GONE
                         }
-
+ 
                         override fun onHideCustomView() {
                             if (customView == null) return
                             playerContainer.removeView(customView)
@@ -542,6 +556,12 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+                
+                if (!kotlinx.coroutines.isActive) {
+                    webView.destroy()
+                    return@launch
+                }
+                
                 playerContainer.addView(webView)
                 webView.loadUrl(actualUrl)
             } else {
@@ -581,6 +601,12 @@ class MainActivity : ComponentActivity() {
                 } else {
                     com.iptv.tvplayer.player.NativePlayerManager.createMPVPlayer(this@MainActivity, resolvedUrl)
                 }
+                
+                if (!kotlinx.coroutines.isActive) {
+                    com.iptv.tvplayer.player.NativePlayerManager.release()
+                    return@launch
+                }
+                
                 if (playerView.parent == null) {
                     playerContainer.addView(playerView)
                 }
@@ -1531,6 +1557,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        playJob?.cancel()
         super.onDestroy()
         localServer?.stop()
         com.iptv.tvplayer.player.NativePlayerManager.release()

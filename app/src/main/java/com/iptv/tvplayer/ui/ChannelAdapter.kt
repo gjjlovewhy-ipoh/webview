@@ -54,7 +54,7 @@ class ChannelAdapter(
         holder.tvName.text = channel.name
         holder.itemView.isSelected = position == selectedPosition
         
-        val logoUrl = com.iptv.tvplayer.data.EpgManager.getChannelLogo(channel.name)
+        val logoUrl = channel.logo ?: com.iptv.tvplayer.data.EpgManager.getChannelLogo(channel.name)
         if (logoUrl != null && logoUrl.isNotEmpty()) {
             ImageLoader.load(logoUrl, holder.ivLogo)
         } else {
