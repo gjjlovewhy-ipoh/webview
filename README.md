@@ -4,7 +4,7 @@
 [![API Level](https://img.shields.io/badge/API-21%2B-blue.svg)](https://developer.android.com/about/dashboards)
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)]()
 
-一款专为 Android TV / 电视盒子打造的**高性能双引擎 IPTV 播放器**。针对大屏及遥控器操作进行了深度定制与极致优化，提供无缝切台、智能 EPG、多协议代理及软硬双解码支持。
+一款专为 Android TV / 电视盒子打造的**高性能双引擎 IPTV 播放器**。针对大屏及遥控器操作进行了深度定制与极致优化，适配主流M3U/TXT列表文件、智能 EPG、多协议代理及软硬双解码支持。
 
 ---
 
